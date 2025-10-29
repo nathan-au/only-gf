@@ -9,43 +9,61 @@ import SwiftUI
 import Photos
 
 struct ContentView: View {
-    @State private var firstImage: UIImage? = nil
+    @State private var photos: [UIImage] = []
+    
     var body: some View {
-        VStack {
-            Image(systemName: "heart.circle")
-                .imageScale(.large)
-                .foregroundStyle(.blue)
-            Text("Welcome to OnlyGF")
-            Button("Request Photo Access") {
-                requestPhotoAccess()
-            }
+        ScrollView {
+            VStack {
+                Image(systemName: "heart.circle")
+                    .imageScale(.large)
+                    .foregroundStyle(.blue)
+                Text("Welcome to OnlyGF")
+                    .font(.title)
+                Button("Subscribe") { requestPhotoAccess() }
+                .buttonStyle(.borderedProminent)
+                .tint(.blue)
             
-            if let img = firstImage {
-                Image(uiImage: img)
-
+                ForEach(photos, id: \.self) { photo in
+                    Image(uiImage: photo)
+                        .resizable()
+                        .scaledToFit()
+                }
             }
-
+            .padding()
         }
-        .padding()
+        
     }
     
     func fetchPhotos() {
         let fetchOptions = PHFetchOptions()
-        fetchOptions.fetchLimit = 1
-        
+        fetchOptions.fetchLimit = 10
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+
         let fetchResults = PHAsset.fetchAssets(with: .image, options: fetchOptions)
         let imageManager = PHImageManager.default()
-        guard let asset = fetchResults.firstObject else {
-            return
-        }
-        imageManager.requestImage(for: asset, targetSize: CGSize(width: 100, height: 100), contentMode: .aspectFit, options: nil) { image, info in
-            
-            if let img = image {
-                self.firstImage = img
+        var assetBucket = Array<UIImage?>(repeating: nil, count: fetchResults.count)
+        let requestOptions = PHImageRequestOptions()
+        requestOptions.deliveryMode = .highQualityFormat
 
+        for i in 0..<fetchResults.count {
+            let asset = fetchResults.object(at: i)
+            imageManager.requestImage(for: asset,
+                                      targetSize: PHImageManagerMaximumSize,
+                                      contentMode: .aspectFit,
+                                      options: requestOptions) { image, info in
+                if let img = image {
+                    DispatchQueue.main.async {
+                        assetBucket[i] = img
+                        self.photos = assetBucket.compactMap { asset in
+                            asset
+                        }
+                    }
+
+                }
             }
-                
         }
+        
+        
     }
     
     func requestPhotoAccess() {
