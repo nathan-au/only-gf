@@ -34,22 +34,41 @@ struct ContentView: View {
                     .gesture(
                         DragGesture()
                             .onChanged { gesture in
-                                dragOffset = gesture.translation
+                                withAnimation(.interactiveSpring()) {
+                                    dragOffset = gesture.translation
+                                }
                             }
                             .onEnded { value in
-                                
-                                dragOffset = CGSize(
-                                    width: value.translation.width * 4, // exaggerate direction
-                                    height: value.translation.height * 4
-                                )
-                                if (currentPhotoIndex < photos.count - 1) {
-                                    currentPhotoIndex += 1
+                                let dragThreshold: CGFloat = 75
+                                if (abs(dragOffset.width) > dragThreshold && currentPhotoIndex < photos.count - 1) {
+                                    
+                                    
+                                    var dragDirection: CGFloat = 0.0
+                                    if (dragOffset.width > 0) {
+                                        dragDirection = 1
+                                    }
+                                    else if (dragOffset.width < 1) {
+                                        dragDirection = -1
+                                    }
+                                    
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        dragOffset = CGSize(width: dragDirection * 1000, height: 0)
+                                    }
+                                    
+                                    
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                        
+                                        currentPhotoIndex += 1
+                                        dragOffset = .zero
+                                    }
                                 }
-                                dragOffset = .zero
+                                else {
+                                    dragOffset = .zero
+                                }
                             }
                     )
                     .offset(x: dragOffset.width, y: dragOffset.height)
-                    .animation(.interactiveSpring(), value: dragOffset)
+                
             }
             
         }
@@ -119,27 +138,39 @@ struct ContentView: View {
         let imageManager = PHImageManager.default()
         var assetBucket = Array<UIImage?>(repeating: nil, count: fetchResults.count)
         var assetBucketCount: Int = 0
+        
+        
         let requestOptions = PHImageRequestOptions()
         requestOptions.deliveryMode = .highQualityFormat
-        for i in 0..<fetchResults.count {
-            let asset = fetchResults.object(at: i)
-            imageManager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .aspectFit, options: requestOptions) { image, info in
-                if let img = image {
-                    DispatchQueue.main.async {
+        
+        DispatchQueue.global(qos: .default).async {
+            for i in 0..<fetchResults.count {
+                let asset = fetchResults.object(at: i)
+                imageManager.requestImage(for: asset, targetSize: PHImageManagerMaximumSize, contentMode: .aspectFit, options: requestOptions) { image, info in
+                    if let img = image {
                         assetBucket[i] = img
                         assetBucketCount += 1
-                        self.loadingPhotosProgress = Double(assetBucketCount) / Double(fetchResults.count)
                         
-                        if (assetBucketCount == fetchResults.count) {
-                            self.photos = assetBucket.compactMap { asset in
-                                asset
+                        DispatchQueue.main.async {
+                            self.loadingPhotosProgress = Double(assetBucketCount) / Double(fetchResults.count)
+                            if (assetBucketCount == fetchResults.count) {
+                                self.photos = assetBucket.compactMap { asset in
+                                    asset
+                                }
+                                self.isLoadingPhotos = false
                             }
-                            self.isLoadingPhotos = false
                         }
+                        
                     }
                 }
             }
+            
+            
+            
+            
         }
+        
+        
         
         
     }
